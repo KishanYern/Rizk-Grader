@@ -213,7 +213,7 @@ def main():
         
         # Check for .cmap uploads (invalid format)
         if data.get('uploaded_cmap') and not cxl_present:
-            penalty_reasons.append("Uploaded .cmap file - please export as .cxl and resubmit")
+            penalty_reasons.append("Uploaded .cmap file instead of .cxl")
         
         if cxl_present and data['grade_data']:
              if not error_msg:
