@@ -13,14 +13,14 @@ from pathlib import Path
 # Section Mapping
 SECTIONS = {
     'DS1': 'COSC3337 18978 - Data Science I',
-    'DS2': 'COSC4337 20367 - Data Science II',  # Placeholder URL
+    'DS2': 'COSC4337 20367 - Data Science II',
     'DSA': 'COSC2436 13434 - Programming and Data Structures'
 }
 
 # Course URLs for content migrations
 COURSE_URLS = {
     'DS1': 'https://canvas.uh.edu/courses/28570/content_migrations',
-    'DS2': 'https://canvas.uh.edu/courses/XXXXX/content_migrations',  # Placeholder
+    'DS2': 'https://canvas.uh.edu/courses/28902/content_migrations',
     'DSA': 'https://canvas.uh.edu/courses/28568/content_migrations'
 }
 
