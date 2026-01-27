@@ -15,22 +15,34 @@ python grader.py <ASSIGNMENT_NAME> <SECTION>
 
 ### Arguments
 
-| Argument          | Description                       | Options                |
-| ----------------- | --------------------------------- | ---------------------- |
-| `ASSIGNMENT_NAME` | Assignment column name for Canvas | e.g., `CMAP0`, `CMAP1` |
-| `SECTION`         | Course section                    | `DS1` or `DS2`         |
+| Argument          | Description                           | Options                          |
+| ----------------- | ------------------------------------- | -------------------------------- |
+| `ASSIGNMENT_NAME` | **Exact** assignment name from Canvas | e.g., `CMAP0`, `"Concept Map 1"` |
+| `SECTION`         | Course section                        | `DS1` or `DS2`                   |
 
-### Example
+> **Note**: The assignment name must match the Canvas assignment name exactly. For multi-word names, wrap in quotes.
+
+### Examples
 
 ```powershell
+# Single word assignment
 python grader.py CMAP0 DS1
+
+# Multi-word assignment name (use quotes)
+python grader.py "Concept Map 1" DS1
 ```
 
 ## Input
 
 ### `submissions.zip`
 
-Canvas mass download containing student files. Expected filename pattern:
+Download directly from Canvas:
+
+1. Go to the assignment page in Canvas
+2. Click **Download Submissions**
+3. Save as `submissions.zip` in this folder
+
+Expected filename pattern inside zip:
 
 ```
 studentname_canvasid_submissionid_originalfilename.ext
