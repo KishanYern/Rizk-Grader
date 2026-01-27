@@ -107,6 +107,26 @@ def analyze_cxl_structure(content: bytes) -> Dict:
     except Exception as e:
          return {'score': 0, 'nc': 0, 'hh': 0, 'error': f"Parsing Exception: {e}"}
 
+def extract_cxl_from_cmap(cmap_bytes: bytes) -> bytes:
+    """
+    Extract CXL content from a .cmap file.
+    .cmap files are ZIP archives containing the CXL XML.
+    """
+    import io
+    try:
+        with zipfile.ZipFile(io.BytesIO(cmap_bytes), 'r') as cmap_zip:
+            # Look for .cxl file inside
+            for name in cmap_zip.namelist():
+                if name.endswith('.cxl'):
+                    return cmap_zip.read(name)
+            # If no .cxl, look for any XML file
+            for name in cmap_zip.namelist():
+                if name.endswith('.xml'):
+                    return cmap_zip.read(name)
+        return None
+    except:
+        return None
+
 def scan_submissions_zip(zip_path: str) -> Dict[str, Dict]:
     """
     Scans the submissions zip and groups files by student Canvas ID.
@@ -132,7 +152,8 @@ def scan_submissions_zip(zip_path: str) -> Dict[str, Dict]:
                             'image_file': None,
                             'error': None,
                             'score': 0,
-                            'grade_data': None
+                            'grade_data': None,
+                            'used_cmap': False
                         }
                     
                     student = students[canvas_id]
@@ -147,6 +168,22 @@ def scan_submissions_zip(zip_path: str) -> Dict[str, Dict]:
                             student['error'] = result['error']
                         else:
                             student['score'] = result['score']
+                    
+                    elif ext == '.cmap':
+                        # .cmap is a ZIP archive containing CXL
+                        student['used_cmap'] = True
+                        cmap_bytes = zf.read(filename)
+                        cxl_content = extract_cxl_from_cmap(cmap_bytes)
+                        if cxl_content:
+                            student['cxl_content'] = cxl_content
+                            result = analyze_cxl_structure(cxl_content)
+                            student['grade_data'] = result
+                            if result['error']:
+                                student['error'] = result['error']
+                            else:
+                                student['score'] = result['score']
+                        else:
+                            student['error'] = "Could not extract CXL from .cmap file"
                     
                     elif ext in ['.pdf', '.jpg', '.jpeg', '.png']:
                         student['image_file'] = filename
@@ -194,7 +231,7 @@ def main():
         penalty_reasons = []
         
         if not cxl_present:
-            penalty_reasons.append("Missing .cxl file")
+            penalty_reasons.append("Missing .cxl/.cmap file")
         if not img_present:
             penalty_reasons.append("Missing image file")
             
@@ -213,14 +250,22 @@ def main():
         
         final_score = min(100, max(0, base_score - penalty_deduction))
         
+        # Add warning for .cmap uploads (no penalty, just warning)
+        warnings = []
+        if data.get('used_cmap'):
+            warnings.append("WARNING: Please upload .cxl files instead of .cmap files in the future")
+        
         if error_msg or penalty_deduction > 0:
             print(f"Student: {name} | Score: {final_score} | Comments: {', '.join(penalty_reasons)}")
+        
+        # Combine penalties and warnings for report
+        all_comments = penalty_reasons + warnings
         
         results.append({
             'canvas_id': canvas_id,
             'name': name,
             'final_score': final_score,
-            'comments': '; '.join(penalty_reasons)
+            'comments': '; '.join(all_comments)
         })
 
     # 2. Write Output (Minimal CSV for Canvas Upload)

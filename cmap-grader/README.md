@@ -50,8 +50,10 @@ studentname_canvasid_submissionid_originalfilename.ext
 
 **Required student files:**
 
--   `.cxl` file (concept map data)
+-   `.cxl` file (preferred) or `.cmap` file (concept map data)
 -   Image file (`.pdf`, `.jpg`, `.png`)
+
+> **Note**: Both `.cxl` and `.cmap` files are accepted, but `.cxl` is preferred. Students who upload `.cmap` files will receive a warning in the report.
 
 ## Output
 
