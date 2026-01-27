@@ -108,3 +108,5 @@ Score = NC + 5 × HH
 | ----- | -------------------------------- |
 | `DS1` | COSC3337 18978 - Data Science I  |
 | `DS2` | COSC4337 20367 - Data Science II |
+
+> **Note**: Section codes change each semester. Update the `SECTIONS` dictionary in `grader.py` if these are incorrect for your current semester.
