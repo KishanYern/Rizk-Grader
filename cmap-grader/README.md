@@ -50,10 +50,10 @@ studentname_canvasid_submissionid_originalfilename.ext
 
 **Required student files:**
 
--   `.cxl` file (preferred) or `.cmap` file (concept map data)
+-   `.cxl` file (concept map data - export from CmapTools as CXL)
 -   Image file (`.pdf`, `.jpg`, `.png`)
 
-> **Note**: Both `.cxl` and `.cmap` files are accepted, but `.cxl` is preferred. Students who upload `.cmap` files will receive a warning in the report.
+> **Note**: `.cmap` files are NOT supported. Students must export their concept map as `.cxl` format from CmapTools (File → Export → CXL).
 
 ## Output
 

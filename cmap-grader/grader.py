@@ -107,25 +107,7 @@ def analyze_cxl_structure(content: bytes) -> Dict:
     except Exception as e:
          return {'score': 0, 'nc': 0, 'hh': 0, 'error': f"Parsing Exception: {e}"}
 
-def extract_cxl_from_cmap(cmap_bytes: bytes) -> bytes:
-    """
-    Extract CXL content from a .cmap file.
-    .cmap files are ZIP archives containing the CXL XML.
-    """
-    import io
-    try:
-        with zipfile.ZipFile(io.BytesIO(cmap_bytes), 'r') as cmap_zip:
-            # Look for .cxl file inside
-            for name in cmap_zip.namelist():
-                if name.endswith('.cxl'):
-                    return cmap_zip.read(name)
-            # If no .cxl, look for any XML file
-            for name in cmap_zip.namelist():
-                if name.endswith('.xml'):
-                    return cmap_zip.read(name)
-        return None
-    except:
-        return None
+
 
 def scan_submissions_zip(zip_path: str) -> Dict[str, Dict]:
     """
@@ -153,7 +135,7 @@ def scan_submissions_zip(zip_path: str) -> Dict[str, Dict]:
                             'error': None,
                             'score': 0,
                             'grade_data': None,
-                            'used_cmap': False
+                            'uploaded_cmap': False
                         }
                     
                     student = students[canvas_id]
@@ -170,20 +152,8 @@ def scan_submissions_zip(zip_path: str) -> Dict[str, Dict]:
                             student['score'] = result['score']
                     
                     elif ext == '.cmap':
-                        # .cmap is a ZIP archive containing CXL
-                        student['used_cmap'] = True
-                        cmap_bytes = zf.read(filename)
-                        cxl_content = extract_cxl_from_cmap(cmap_bytes)
-                        if cxl_content:
-                            student['cxl_content'] = cxl_content
-                            result = analyze_cxl_structure(cxl_content)
-                            student['grade_data'] = result
-                            if result['error']:
-                                student['error'] = result['error']
-                            else:
-                                student['score'] = result['score']
-                        else:
-                            student['error'] = "Could not extract CXL from .cmap file"
+                        # .cmap files are not supported (Java binary format)
+                        student['uploaded_cmap'] = True
                     
                     elif ext in ['.pdf', '.jpg', '.jpeg', '.png']:
                         student['image_file'] = filename
@@ -231,7 +201,7 @@ def main():
         penalty_reasons = []
         
         if not cxl_present:
-            penalty_reasons.append("Missing .cxl/.cmap file")
+            penalty_reasons.append("Missing .cxl file")
         if not img_present:
             penalty_reasons.append("Missing image file")
             
@@ -240,6 +210,10 @@ def main():
             
         base_score = 0
         error_msg = data.get('error')
+        
+        # Check for .cmap uploads (invalid format)
+        if data.get('uploaded_cmap') and not cxl_present:
+            penalty_reasons.append("Uploaded .cmap file - please export as .cxl and resubmit")
         
         if cxl_present and data['grade_data']:
              if not error_msg:
@@ -250,22 +224,14 @@ def main():
         
         final_score = min(100, max(0, base_score - penalty_deduction))
         
-        # Add warning for .cmap uploads (no penalty, just warning)
-        warnings = []
-        if data.get('used_cmap'):
-            warnings.append("WARNING: Please upload .cxl files instead of .cmap files in the future")
-        
-        if error_msg or penalty_deduction > 0:
+        if error_msg or penalty_deduction > 0 or data.get('uploaded_cmap'):
             print(f"Student: {name} | Score: {final_score} | Comments: {', '.join(penalty_reasons)}")
-        
-        # Combine penalties and warnings for report
-        all_comments = penalty_reasons + warnings
         
         results.append({
             'canvas_id': canvas_id,
             'name': name,
             'final_score': final_score,
-            'comments': '; '.join(all_comments)
+            'comments': '; '.join(penalty_reasons)
         })
 
     # 2. Write Output (Minimal CSV for Canvas Upload)
@@ -317,6 +283,41 @@ def main():
             writer.writerow(report_header)
             writer.writerows(report_rows)
         print(f"Comments report written to {report_file} ({len(report_rows)} students with issues)")
+
+    # 4. Statistics Summary
+    scores = [res['final_score'] for res in results]
+    if scores:
+        scores_sorted = sorted(scores)
+        n = len(scores)
+        mean = sum(scores) / n
+        
+        # Standard deviation
+        variance = sum((x - mean) ** 2 for x in scores) / n
+        std = variance ** 0.5
+        
+        # Quartiles
+        def percentile(data, p):
+            k = (len(data) - 1) * p / 100
+            f = int(k)
+            c = f + 1 if f + 1 < len(data) else f
+            return data[f] + (k - f) * (data[c] - data[f])
+        
+        q1 = percentile(scores_sorted, 25)
+        median = percentile(scores_sorted, 50)
+        q3 = percentile(scores_sorted, 75)
+        
+        print("\n" + "=" * 40)
+        print("GRADE STATISTICS")
+        print("=" * 40)
+        print(f"  Count:    {n}")
+        print(f"  Mean:     {mean:.2f}")
+        print(f"  Std Dev:  {std:.2f}")
+        print(f"  Min:      {min(scores)}")
+        print(f"  Q1:       {q1:.2f}")
+        print(f"  Median:   {median:.2f}")
+        print(f"  Q3:       {q3:.2f}")
+        print(f"  Max:      {max(scores)}")
+        print("=" * 40)
 
 if __name__ == '__main__':
     main()
