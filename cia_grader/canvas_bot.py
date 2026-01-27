@@ -20,7 +20,7 @@ SECTIONS = {
 # Course URLs for content migrations
 COURSE_URLS = {
     'DS1': 'https://canvas.uh.edu/courses/28570/content_migrations',
-    'DS2': 'https://canvas.uh.edu/courses/XXXXX/content_migrations',  # Placeholder
+    'DS2': 'https://canvas.uh.edu/courses/28902/content_migrations',
     'DSA': 'https://canvas.uh.edu/courses/28568/content_migrations'
 }
 
