@@ -10,11 +10,11 @@ from collections import deque
 # Configuration
 OUTPUT_FILE = 'graded_canvas_import.csv'
 SUBMISSIONS_ZIP = 'submissions.zip'
-
 # Section Mapping
 SECTIONS = {
     'DS1': 'COSC3337 18978 - Data Science I',
-    'DS2': 'COSC4337 20367 - Data Science II'
+    'DS2': 'COSC4337 20367 - Data Science II',
+    'DSA': 'COSC2436 13434 - Programming and Data Structures'
 }
 
 def normalize_text(text: str) -> str:
