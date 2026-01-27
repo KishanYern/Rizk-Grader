@@ -18,7 +18,7 @@ python grader.py <ASSIGNMENT_NAME> <SECTION>
 | Argument          | Description                           | Options                          |
 | ----------------- | ------------------------------------- | -------------------------------- |
 | `ASSIGNMENT_NAME` | **Exact** assignment name from Canvas | e.g., `CMAP0`, `"Concept Map 1"` |
-| `SECTION`         | Course section                        | `DS1` or `DS2`                   |
+| `SECTION`         | Course section                        | `DS1`, `DS2`, or `DSA`           |
 
 > **Note**: The assignment name must match the Canvas assignment name exactly. For multi-word names, wrap in quotes.
 
@@ -106,9 +106,10 @@ Score = NC + 5 × HH
 
 ## Sections
 
-| Code  | Full Name                        |
-| ----- | -------------------------------- |
-| `DS1` | COSC3337 18978 - Data Science I  |
-| `DS2` | COSC4337 20367 - Data Science II |
+| Code  | Full Name                                        |
+| ----- | ------------------------------------------------ |
+| `DS1` | COSC3337 18978 - Data Science I                  |
+| `DS2` | COSC4337 20367 - Data Science II                 |
+| `DSA` | COSC2436 13434 - Programming and Data Structures |
 
 > **Note**: Section codes change each semester. Update the `SECTIONS` dictionary in `grader.py` if these are incorrect for your current semester.

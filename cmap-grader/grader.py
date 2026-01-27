@@ -166,7 +166,7 @@ def scan_submissions_zip(zip_path: str) -> Dict[str, Dict]:
 def main():
     parser = argparse.ArgumentParser(description='Grade CXL Concept Maps')
     parser.add_argument('assignment', type=str, help='Assignment name (column header in Canvas CSV)')
-    parser.add_argument('section', type=str, choices=['DS1', 'DS2'], help='Section: DS1 (Data Science I) or DS2 (Data Science II)')
+    parser.add_argument('section', type=str, choices=['DS1', 'DS2', 'DSA'], help='Section: DS1, DS2, or DSA')
     parser.add_argument('--zip', type=str, default=SUBMISSIONS_ZIP, help='Path to submissions zip')
     parser.add_argument('--output', type=str, default=OUTPUT_FILE, help='Output CSV filename')
     args = parser.parse_args()
