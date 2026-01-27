@@ -1,6 +1,7 @@
 import os
 import asyncio
 import re
+import csv
 import pandas as pd
 from datetime import datetime
 from playwright import async_api
@@ -9,9 +10,23 @@ from openpyxl import load_workbook
 import traceback
 from pathlib import Path
 
+# Section Mapping
+SECTIONS = {
+    'DS1': 'COSC3337 18978 - Data Science I',
+    'DS2': 'COSC4337 20367 - Data Science II',  # Placeholder URL
+    'DSA': 'COSC2436 13434 - Programming and Data Structures'
+}
+
+# Course URLs for content migrations
+COURSE_URLS = {
+    'DS1': 'https://canvas.uh.edu/courses/28570/content_migrations',
+    'DS2': 'https://canvas.uh.edu/courses/XXXXX/content_migrations',  # Placeholder
+    'DSA': 'https://canvas.uh.edu/courses/28568/content_migrations'
+}
+
 class CanvasBot:
     """
-    A class to automate interactions with Canvas, including login and navigation.
+    A class to automate interactions with Canvas, including login, QTI upload, and grade tracking.
     """
     def __init__(self, email, password, canvas_url="https://canvas.uh.edu/"):
         """
@@ -29,6 +44,8 @@ class CanvasBot:
         self.browser = None
         self.context = None
         self.page = None
+        # Track upload results for grading
+        self.upload_results = []
 
     async def _initialize_browser(self):
         """Initializes the Playwright instance and launches a browser with anti-detection measures."""
@@ -42,6 +59,21 @@ class CanvasBot:
                 "useAutomationExtension": False,
                 "general.platform.override": "MacIntel",
                 "general.useragent.override": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/121.0"
+            }
+        )
+        
+        self.context = await self.browser.new_context(
+            viewport={'width': 1440, 'height': 900},
+            user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/121.0',
+            locale='en-US',
+            timezone_id='America/Chicago',
+            extra_http_headers={
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
             }
         )
         
@@ -88,6 +120,34 @@ class CanvasBot:
             print("Network idle timeout reached, falling back to 'domcontentloaded'.")
             await self.page.wait_for_load_state("domcontentloaded", timeout=timeout)
 
+    def _parse_student_info_from_filename(self, filename: str) -> dict:
+        """
+        Extract student info from the QTI zip filename.
+        Expected patterns:
+        - studentname_canvasid_assignmentname.zip
+        - studentname_canvasid.zip
+        - Or just the filename as the student name
+        """
+        stem = Path(filename).stem
+        
+        # Try pattern: name_id_assignment
+        parts = stem.split('_')
+        if len(parts) >= 2:
+            # Check if second part looks like a Canvas ID (all digits)
+            if parts[1].isdigit():
+                return {
+                    'name': parts[0],
+                    'canvas_id': parts[1],
+                    'original_filename': filename
+                }
+        
+        # Fallback: use entire stem as name, no ID
+        return {
+            'name': stem,
+            'canvas_id': '',
+            'original_filename': filename
+        }
+
     async def navigate_to_content_uploader_and_upload(self, url):
         """Navigates to a specific URL and uploads all QTI files from the 'cias' directory."""
         print(f"\nNavigating to URL: {url}")
@@ -107,13 +167,27 @@ class CanvasBot:
         print(f"Found {len(zip_files)} zip files to upload: {[f.name for f in zip_files]}")
         
         for zip_file in zip_files:
-            await self._upload_single_qti_file(zip_file)
+            result = await self._upload_single_qti_file(zip_file)
+            self.upload_results.append(result)
             await asyncio.sleep(3)
 
-    async def _upload_single_qti_file(self, zip_file_path):
-        """Uploads a single QTI zip file through the Canvas import flow."""
+    async def _upload_single_qti_file(self, zip_file_path) -> dict:
+        """
+        Uploads a single QTI zip file through the Canvas import flow.
+        Returns a dict with upload status for grading.
+        """
         file_name = zip_file_path.name
         file_name_without_ext = zip_file_path.stem
+        student_info = self._parse_student_info_from_filename(file_name)
+        
+        result = {
+            'filename': file_name,
+            'name': student_info['name'],
+            'canvas_id': student_info['canvas_id'],
+            'success': False,
+            'score': 0,
+            'error': None
+        }
         
         print(f"\n📤 Starting upload for: {file_name}")
         
@@ -171,10 +245,7 @@ class CanvasBot:
             
             # Step 5: Submit the form
             print("5. Submitting import...")
-            # Use the stable data-testid from the provided HTML for the most reliable locator
             submit_button = self.page.locator('[data-testid="submitMigration"]')
-            
-            # Playwright's click action automatically waits for the element to be visible, stable, and enabled.
             await submit_button.click()
             print("✅ Clicked 'Add to Import Queue'.")
             
@@ -182,12 +253,20 @@ class CanvasBot:
             
             if "content_migrations" in self.page.url:
                 print(f"✅ Successfully initiated import for: {file_name}")
+                result['success'] = True
+                result['score'] = 100
             else:
                 print(f"⚠️ Unexpected page after import: {self.page.url}")
+                result['error'] = f"Unexpected redirect: {self.page.url}"
                 
         except Exception as e:
             print(f"❌ An unexpected error occurred during the upload of {file_name}:")
             traceback.print_exc()
+            result['error'] = str(e)
+            result['success'] = False
+            result['score'] = 0
+        
+        return result
 
     async def _handle_microsoft_login(self):
         """Handles the Microsoft/Azure AD login flow."""
@@ -288,19 +367,97 @@ class CanvasBot:
         except:
             print("⚠️ Could not verify Canvas login, but proceeding...")
 
-    async def run(self):
+    def generate_grades_csv(self, assignment_name: str, section_code: str, output_dir: str = "."):
+        """
+        Generate Canvas-compatible grades CSV and a report CSV.
+        """
+        section_name = SECTIONS.get(section_code, section_code)
+        output_file = os.path.join(output_dir, f"{assignment_name}_{section_code}_grades.csv")
+        report_file = os.path.join(output_dir, f"{assignment_name}_{section_code}_report.csv")
+        
+        # Grades CSV (Canvas format)
+        header = ['Student', 'ID', 'SIS User ID', 'SIS Login ID', 'Section', assignment_name]
+        rows = [['Points Possible', '', '', '', '', 100]]
+        
+        for res in self.upload_results:
+            rows.append([
+                res['name'],
+                res['canvas_id'],
+                '',
+                '',
+                section_name,
+                res['score']
+            ])
+        
+        with open(output_file, 'w', encoding='utf-8', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(header)
+            writer.writerows(rows)
+        
+        print(f"\n📊 Grades CSV written to: {output_file}")
+        
+        # Report CSV (issues only)
+        report_header = ['Student Name', 'Canvas ID', 'Score', 'Filename', 'Comments']
+        report_rows = []
+        
+        for res in self.upload_results:
+            if not res['success'] or res['error']:
+                comment = res['error'] if res['error'] else 'Upload failed'
+                report_rows.append([
+                    res['name'],
+                    res['canvas_id'],
+                    res['score'],
+                    res['filename'],
+                    comment
+                ])
+        
+        if report_rows:
+            with open(report_file, 'w', encoding='utf-8', newline='') as f:
+                writer = csv.writer(f)
+                writer.writerow(report_header)
+                writer.writerows(report_rows)
+            print(f"📋 Report written to: {report_file} ({len(report_rows)} students with issues)")
+        else:
+            print("✅ No upload issues - all students passed!")
+        
+        # Print statistics
+        scores = [res['score'] for res in self.upload_results]
+        if scores:
+            successful = sum(1 for s in scores if s > 0)
+            failed = sum(1 for s in scores if s == 0)
+            
+            print("\n" + "=" * 40)
+            print("UPLOAD STATISTICS")
+            print("=" * 40)
+            print(f"  Total:      {len(scores)}")
+            print(f"  Successful: {successful}")
+            print(f"  Failed:     {failed}")
+            print("=" * 40)
+
+    async def run(self, section_code: str = 'DS1', assignment_name: str = 'CIA'):
         """
         The main execution method to run the entire automation process.
+        
+        Args:
+            section_code: One of 'DS1', 'DS2', 'DSA'
+            assignment_name: Name of the assignment for the grades CSV
         """
         try:
             await self._initialize_browser()
             await self._login_to_canvas()
             
-            import_url = "https://canvas.uh.edu/courses/28570/content_migrations"
+            import_url = COURSE_URLS.get(section_code)
+            if not import_url or 'XXXXX' in import_url:
+                print(f"❌ Error: No valid URL configured for section {section_code}")
+                return
+                
             await self.navigate_to_content_uploader_and_upload(import_url)
 
-            print(f"\n--- Process Complete ---")
+            print(f"\n--- Upload Process Complete ---")
             print("✅ Bot finished uploading all QTI files.")
+            
+            # Generate grades CSV
+            self.generate_grades_csv(assignment_name, section_code)
 
             print("\n🔍 Browser will stay open for 15 seconds for inspection...")
             await asyncio.sleep(15)
@@ -330,7 +487,7 @@ async def main():
         return
 
     bot = CanvasBot(email, password)
-    await bot.run()
+    await bot.run(section_code='DS1', assignment_name='CIA')
 
 if __name__ == "__main__":
     asyncio.run(main())
