@@ -7,7 +7,7 @@ Automated grading tools for Dr. Rizk's courses.
 | Tool                          | Description            |
 | ----------------------------- | ---------------------- |
 | [cmap-grader](./cmap-grader/) | CXL Concept Map grader |
-| cia-grader                    | _Coming soon_          |
+| cia-grader                    | CIA grader             |
 
 ## Usage
 
