@@ -6,6 +6,10 @@ submissions.zip
 # Python
 __pycache__/
 *.pyc
+venv/
+
+# Student submissions (private data)
+cias/
 
 # OS
 .DS_Store

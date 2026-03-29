@@ -9,6 +9,8 @@ import zipfile
 from openpyxl import load_workbook
 import traceback
 from pathlib import Path
+import tempfile
+import shutil
 
 # Section Mapping
 SECTIONS = {
@@ -190,6 +192,34 @@ class CanvasBot:
         }
         
         print(f"\n📤 Starting upload for: {file_name}")
+
+        temp_dir = None
+        actual_upload_path = zip_file_path
+
+        try:
+            # Check for inner QTI zip
+            with zipfile.ZipFile(zip_file_path, 'r') as zf:
+                file_list = zf.namelist()
+                # A valid Canvas QTI zip usually has imsmanifest.xml at the root or inside a folder
+                has_manifest = any('imsmanifest.xml' in f for f in file_list)
+                if not has_manifest:
+                    inner_zips = [f for f in file_list if f.lower().endswith('.zip')]
+                    if inner_zips:
+                        inner_zip_name = inner_zips[0]
+                        print(f"📦 Found container zip. Extracting inner QTI zip: {inner_zip_name}")
+                        temp_dir = tempfile.mkdtemp()
+                        zf.extract(inner_zip_name, temp_dir)
+                        actual_upload_path = Path(temp_dir) / inner_zip_name
+                    else:
+                        print(f"⚠️ Warning: {file_name} does not look like a QTI zip and contains no inner zip.")
+        except zipfile.BadZipFile:
+            print(f"❌ Error: {file_name} is not a valid zip file.")
+            result['error'] = "Bad zip file"
+            return result
+        except Exception as e:
+            print(f"❌ Error checking zip contents: {e}")
+            result['error'] = f"Zip check error: {e}"
+            return result
         
         try:
             # Step 1: Select QTI .zip file content type
@@ -211,11 +241,14 @@ class CanvasBot:
             # Step 2: Upload the file using the direct input method
             print("2. Attaching the QTI .zip file...")
             file_input_locator = self.page.locator('input[type="file"]')
-            await file_input_locator.set_input_files(str(zip_file_path))
-            print(f"✅ File attached directly via set_input_files: {file_name}")
+            await file_input_locator.set_input_files(str(actual_upload_path))
+            print(f"✅ File attached directly via set_input_files: {actual_upload_path.name}")
 
-            await self.page.wait_for_selector(f'text="{file_name}"', timeout=10000)
-            print("✅ Verified that the file name appeared on the page.")
+            try:
+                await self.page.wait_for_selector(f'text="{actual_upload_path.name}"', timeout=10000)
+                print("✅ Verified that the file name appeared on the page.")
+            except Exception:
+                print("⚠️ File name verification text not found, continuing anyway.")
 
             # Step 3: Select "Create new question bank" and name it
             print("3. Setting up new question bank...")
@@ -265,6 +298,9 @@ class CanvasBot:
             result['error'] = str(e)
             result['success'] = False
             result['score'] = 0
+        finally:
+            if temp_dir and os.path.exists(temp_dir):
+                shutil.rmtree(temp_dir, ignore_errors=True)
         
         return result
 
